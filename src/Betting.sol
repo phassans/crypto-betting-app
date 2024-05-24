@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/access/OwnerIsCreator.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Betting is OwnerIsCreator {
@@ -35,10 +35,10 @@ contract Betting is OwnerIsCreator {
     mapping(address => bool) userAllowed;
 
     // betting Info
-    BetInfo[] private betInfos;
-    mapping(address => uint256[]) private betIdsForUser;
-    uint256[] private pendingBetIDs;
-    uint256[] private activeBetIDs;
+    BetInfo[] private s_betInfos;
+    mapping(address => uint256[]) private s_betIdsForUser;
+    uint256[] private s_pendingBetIDs;
+    uint256[] private s_activeBetIDs;
     uint256 public betCount;
 
     // events
@@ -81,9 +81,9 @@ contract Betting is OwnerIsCreator {
         newBet.closingTime = _closingTime;
         newBet.betStatus = 0; // pending
 
-        betInfos.push(newBet);
-        betIdsForUser[msg.sender].push(betCount);
-        pendingBetIDs.push(betCount);
+        s_betInfos.push(newBet);
+        s_betIdsForUser[msg.sender].push(betCount);
+        s_pendingBetIDs.push(betCount);
 
         emit NewBetCreated(betCount, msg.sender, _usdcAmount, isLong, newBet.createTime, _expireTime, _closingTime);
         return betCount++;
@@ -92,80 +92,80 @@ contract Betting is OwnerIsCreator {
     function joinBet(uint256 _betID, uint256 _usdcAmount) public payable returns (uint256) {
         require(userAllowed[msg.sender], "Invalid request: You are not registered!");
         require(_betID < betCount, "Invalid request: Betting ID is invalid!");
-        require(betInfos[_betID].betStatus == 0 && betInfos[_betID].expireTime >= block.timestamp, "Invalid request: The Bet is closed!");
-        require(betInfos[_betID].amount == _usdcAmount, "Invalid request: You must deposit the same amount of USDC as the creator!");
+        require(s_betInfos[_betID].betStatus == 0 && s_betInfos[_betID].expireTime >= block.timestamp, "Invalid request: The Bet is closed!");
+        require(s_betInfos[_betID].amount == _usdcAmount, "Invalid request: You must deposit the same amount of USDC as the creator!");
         require(USDCTokenAddress.balanceOf(msg.sender) >= _usdcAmount, "Invalid request: Insufficient USDC balance for deposit!");
 
         USDCTokenAddress.transferFrom(msg.sender, address(this), _usdcAmount);
 
-        betInfos[_betID].userB = msg.sender;
-        betInfos[_betID].openingPrice = getBTCPrice();
-        betInfos[_betID].betStatus = 1; // active
+        s_betInfos[_betID].userB = msg.sender;
+        s_betInfos[_betID].openingPrice = getBTCPrice();
+        s_betInfos[_betID].betStatus = 1; // active
 
-        betIdsForUser[msg.sender].push(_betID);
-        activeBetIDs.push(_betID);
-        for (uint i = 0; i <= pendingBetIDs.length; i++) {
-            if (pendingBetIDs[i] == _betID) {
-                pendingBetIDs.pop();
+        s_betIdsForUser[msg.sender].push(_betID);
+        s_activeBetIDs.push(_betID);
+        for (uint i = 0; i <= s_pendingBetIDs.length; i++) {
+            if (s_pendingBetIDs[i] == _betID) {
+                s_pendingBetIDs.pop();
                 break;
             }
         }
 
-        emit BetActived(_betID, msg.sender, betInfos[_betID].openingPrice);
-        return betInfos[_betID].openingPrice;
+        emit BetActived(_betID, msg.sender, s_betInfos[_betID].openingPrice);
+        return s_betInfos[_betID].openingPrice;
     }
 
     function resolveBet(uint256 _betID) external onlyBot {
         require(msg.sender == botAddress, "Permission Error: You are not allowed to close a betting!");
         require(_betID < betCount, "Invalid request: Betting ID is invalid!");
-        require(betInfos[_betID].betStatus == 1, "Invalid request: Bet is not active");
-        require(betInfos[_betID].closingTime <= block.timestamp, "Invalid request: Closing time has not arrived!");
+        require(s_betInfos[_betID].betStatus == 1, "Invalid request: Bet is not active");
+        require(s_betInfos[_betID].closingTime <= block.timestamp, "Invalid request: Closing time has not arrived!");
 
-        betInfos[_betID].closingPrice = getBTCPrice();
+        s_betInfos[_betID].closingPrice = getBTCPrice();
 
-        if (betInfos[_betID].isLong) {
-            betInfos[_betID].winner = (betInfos[_betID].openingPrice < betInfos[_betID].closingPrice) ? betInfos[_betID].userA : betInfos[_betID].userB;
+        if (s_betInfos[_betID].isLong) {
+            s_betInfos[_betID].winner = (s_betInfos[_betID].openingPrice < s_betInfos[_betID].closingPrice) ? s_betInfos[_betID].userA : s_betInfos[_betID].userB;
         } else {
-            betInfos[_betID].winner = (betInfos[_betID].openingPrice > betInfos[_betID].closingPrice) ? betInfos[_betID].userA : betInfos[_betID].userB;
+            s_betInfos[_betID].winner = (s_betInfos[_betID].openingPrice > s_betInfos[_betID].closingPrice) ? s_betInfos[_betID].userA : s_betInfos[_betID].userB;
         }
 
-        uint256 totalAmount = betInfos[_betID].amount * 2;
+        uint256 totalAmount = s_betInfos[_betID].amount * 2;
         uint256 botFee = (totalAmount * botFeeBasisPoints) / 10000;
-        betInfos[_betID].reward = totalAmount - botFee;
+        s_betInfos[_betID].reward = totalAmount - botFee;
 
         require(USDCTokenAddress.balanceOf(address(this)) >= botFee, "Error: Insufficient USDC balance!");
         USDCTokenAddress.transfer(botAddress, botFee);
 
-        emit BetClosed(_betID, false, betInfos[_betID].closingPrice, betInfos[_betID].reward, botFee);
+        emit BetClosed(_betID, false, s_betInfos[_betID].closingPrice, s_betInfos[_betID].reward, botFee);
 
-        betInfos[_betID].betStatus = 2;
+        s_betInfos[_betID].betStatus = 2;
     }
 
 
 
     function withdraw(uint256 _betID) external {
         require(_betID < betCount, "Invalid request: Betting ID is invalid!");
-        require(msg.sender == betInfos[_betID].winner, "Invalid request: Only winner can withdraw!");
-        require(betInfos[_betID].betStatus != 3, "Invalid request: You already have withdrawn funds!");
-        require(betInfos[_betID].betStatus == 2, "Invalid request: Bet is not closed!");
+        require(msg.sender == s_betInfos[_betID].winner, "Invalid request: Only winner can withdraw!");
+        require(s_betInfos[_betID].betStatus != 3, "Invalid request: You already have withdrawn funds!");
+        require(s_betInfos[_betID].betStatus == 2, "Invalid request: Bet is not closed!");
 
-        require(USDCTokenAddress.balanceOf(address(this)) >= betInfos[_betID].reward, "Error: Insufficient USDC balance!");
-        USDCTokenAddress.transfer(msg.sender, betInfos[_betID].reward);
+        require(USDCTokenAddress.balanceOf(address(this)) >= s_betInfos[_betID].reward, "Error: Insufficient USDC balance!");
+        USDCTokenAddress.transfer(msg.sender, s_betInfos[_betID].reward);
 
-        betInfos[_betID].betStatus = 3;
+        s_betInfos[_betID].betStatus = 3;
 
-        emit RewardWithdrawal(_betID, msg.sender, betInfos[_betID].reward);
+        emit RewardWithdrawal(_betID, msg.sender, s_betInfos[_betID].reward);
     }
 
     function refundBet(uint256 betId) external {
-        BetInfo storage bet = betInfos[betId];
-        require(betInfos[betId].betStatus == 0, "Invalid request: Bet is not in pending state");
+        BetInfo storage bet = s_betInfos[betId];
+        require(s_betInfos[betId].betStatus == 0, "Invalid request: Bet is not in pending state");
         require(block.timestamp > bet.expireTime, "Invalid request: Bet expiration time has not yet been reached");
         require(bet.userA == msg.sender, "Invalid request: Only the bet creator can request a refund");
 
         USDCTokenAddress.transfer(bet.userA, bet.amount);
 
-        delete betInfos[betId];
+        delete s_betInfos[betId];
 
         emit BetRefunded(betId, bet.userA, bet.amount);
     }
@@ -176,32 +176,32 @@ contract Betting is OwnerIsCreator {
     }
 
     function getBTCPrice() public view returns (uint256) {
-       (, int256 price,,,) = priceFeedAddress.latestRoundData();
-       return uint256(price);
+        (, int256 price,,,) = priceFeedAddress.latestRoundData();
+        return uint256(price);
     }
 
     function getBetIdsForUser(address _userAddress) public view returns (uint256[] memory) {
-        return betIdsForUser[_userAddress];
+        return s_betIdsForUser[_userAddress];
     }
 
     function getBetInfo(uint256 _betID) public view returns (BetInfo memory) {
         require(_betID < betCount, "Invalid request: Betting ID is invalid!");
-        return betInfos[_betID];
+        return s_betInfos[_betID];
     }
 
     function getPendingBetIDs() public view returns (uint256[] memory) {
-        return pendingBetIDs;
+        return s_pendingBetIDs;
     }
 
     function getActiveBetIDs() public view returns (uint256[] memory) {
-        return activeBetIDs;
+        return s_activeBetIDs;
     }
 
     function setPriceFeedAddress(address _feedAddress) external onlyOwner {
         priceFeedAddress = AggregatorV3Interface(_feedAddress);
     }
 
-   function getPriceFeedAddress() external view returns (address) {
+    function getPriceFeedAddress() external view returns (address) {
         return address(priceFeedAddress);
     }
 

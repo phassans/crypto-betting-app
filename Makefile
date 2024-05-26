@@ -10,7 +10,7 @@ clean  :; forge clean
 # Remove modules
 remove :; rm -rf .gitmodules && rm -rf .git/modules/* && rm -rf lib && touch .gitmodules && git add . && git commit -m "modules"
 
-install :; forge install dapphub/ds-test && forge install OpenZeppelin/openzeppelin-contracts && forge install smartcontractkit/chainlink
+install :; npm install @chainlink/contracts && npm install @openzeppelin/contracts && npm install forge-std && npm install dapphub/ds-test
 
 # Update Dependencies
 update:; forge update

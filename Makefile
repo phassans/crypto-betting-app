@@ -8,7 +8,7 @@ all: clean remove install update build
 clean  :; forge clean
 
 # Remove modules
-remove :; rm -rf .gitmodules && rm -rf .git/modules/* && rm -rf lib && touch .gitmodules
+remove :; rm -rf node_modules
 
 install :; npm install @chainlink/contracts && npm install @openzeppelin/contracts && npm install forge-std && npm install dapphub/ds-test
 

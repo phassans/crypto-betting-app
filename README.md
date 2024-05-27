@@ -1,8 +1,7 @@
-### Betting.sol README
 
 ---
 
-## Betting.sol
+## Betting App
 
 **Betting.sol** is a smart contract designed for a decentralized betting platform. Users can create bets, join existing bets, resolve bets, withdraw winnings, and request refunds if a bet is canceled or not matched.
 

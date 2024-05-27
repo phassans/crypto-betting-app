@@ -13,6 +13,8 @@
 - **Withdraw**: The winner of a resolved bet can withdraw their winnings.
 - **Refund**: Users can request a refund if a bet is canceled or not matched.
 
+#### ** Note: The bot functionality is not implemented. The Resolve Bet function should be triggered to complete the bet. **
+
 ### Prerequisites
 
 - Solidity ^0.8.0
